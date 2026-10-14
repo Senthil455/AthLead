@@ -157,7 +157,7 @@ test("getRanking applies deterministic sort with _id tie-breaker and preserves d
     // Verify optimized query chaining with deterministic tie-breaker
     assert.deepEqual(calls.findFilter, {});
     assert.deepEqual(calls.sortArg, { score: -1, _id: 1 });
-    assert.equal(calls.selectArg, "user score");
+    assert.equal(calls.selectArg, "user score sport");
     assert.equal(calls.populatePath, "user");
     assert.equal(calls.populateFields, "fullname image state gender");
     assert.equal(calls.leanCalled, true);

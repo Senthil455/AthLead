@@ -143,7 +143,7 @@ export const getRanking = async (req, res) => {
 
     let query = Score.find({})
       .sort({ score: -1, _id: 1 })
-      .select("user score")
+      .select("user score sport")
       .populate("user", "fullname image state gender")
       .lean();
 

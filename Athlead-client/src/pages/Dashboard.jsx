@@ -67,58 +67,40 @@ const Dashboard = () => {
       return;
     }
 
+    const buildRadar = (source) => {
+      if (!source || typeof source !== "object") return false;
+      const metrics = [
+        ["VO2 Max", source.vo2_max],
+        ["HRV", source.hrv],
+        ["Lactate Threshold", source.lactate_threshold],
+        ["Stride Length", source.stride_length],
+        ["Cadence", source.cadence],
+        ["Force Application", source.force_application],
+        ["Performance Score", source.performance_score],
+        ["Adaptability Score", source.adaptability_score],
+      ];
+      if (metrics.every(([, value]) => value === undefined)) return false;
+      setRadarChartData(metrics.map(([metric, value]) => ({ metric, value })));
+      return true;
+    };
+
     const scoreStorageKey = `athlead_score_data:${user._id}`;
     const storedScore = localStorage.getItem(scoreStorageKey);
 
-    if (!storedScore) {
-      return;
-    }
-
-    try {
-      const scoreData = JSON.parse(storedScore);
-
-      if (!scoreData || typeof scoreData !== "object") {
-        return;
+    if (storedScore) {
+      try {
+        const scoreData = JSON.parse(storedScore);
+        if (buildRadar(scoreData)) return;
+      } catch (error) {
+        console.error("Failed to parse stored score data:", error);
       }
-
-      setRadarChartData([
-        {
-          metric: "VO2 Max",
-          value: scoreData.vo2_max,
-        },
-        {
-          metric: "HRV",
-          value: scoreData.hrv,
-        },
-        {
-          metric: "Lactate Threshold",
-          value: scoreData.lactate_threshold,
-        },
-        {
-          metric: "Stride Length",
-          value: scoreData.stride_length,
-        },
-        {
-          metric: "Cadence",
-          value: scoreData.cadence,
-        },
-        {
-          metric: "Force Application",
-          value: scoreData.force_application,
-        },
-        {
-          metric: "Performance Score",
-          value: scoreData.performance_score,
-        },
-        {
-          metric: "Adaptability Score",
-          value: scoreData.adaptability_score,
-        },
-      ]);
-    } catch (error) {
-      console.error("Failed to parse stored score data:", error);
     }
-  }, [user]);
+
+    // Fall back to the latest server score so a cleared cache or a new
+    // device still shows the radar when the API has data.
+    const latest = scores?.[0]?.inputSnapshot ?? scores?.[0];
+    if (latest) buildRadar(latest);
+  }, [user, scores]);
 
   const fetchScores = useCallback(async () => {
     setScoresError(null);
@@ -237,11 +219,23 @@ const Dashboard = () => {
               <ProfileSkeleton />
             ) : (
               <>
-                <img
-                  src={user?.image}
-                  alt="Profile"
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full p-2 shrink-0"
-                />
+                {user?.image ? (
+                  <img
+                    src={user.image}
+                    alt="Profile"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full p-2 shrink-0 object-cover"
+                  />
+                ) : (
+                  <div
+                    aria-label="Profile placeholder"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full shrink-0 flex items-center justify-center bg-teal-600/20 text-teal-200 font-bold text-xl"
+                  >
+                    {(user?.fullname?.trim()?.[0] ?? "A").toUpperCase()}
+                  </div>
+                )}
 
                 <div className="flex min-w-0 flex-col items-start justify-center">
                   <h1 className="font-semibold font-segoe text-xl break-words">
@@ -347,12 +341,12 @@ const Dashboard = () => {
                         {p.originalRank && p.originalRank <= 4 ? (
                           <div
                             className={`mx-auto w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
-                              p.originalRank === 2
+                              p.originalRank === 1
                                 ? "bg-amber-400/15 text-amber-400"
-                                : p.originalRank === 3
-                                  ? "bg-slate-400/15 text-slate-400"
-                                  : p.originalRank === 1
-                                    ? "bg-orange-800/15 text-orange-700"
+                                : p.originalRank === 2
+                                  ? "bg-slate-400/15 text-slate-300"
+                                  : p.originalRank === 3
+                                    ? "bg-orange-800/15 text-orange-400"
                                     : "bg-slate-400/15 text-slate-400"
                             }`}
                           >
@@ -373,7 +367,9 @@ const Dashboard = () => {
                         {p.user?.fullname?.split(" ")[0]}{" "}
                       </td>
 
-                      <td className="px-3 py-3 whitespace-nowrap">cycling</td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        {p.sport ?? p.user?.sport ?? "-"}
+                      </td>
                       <td className="px-3 py-3 whitespace-nowrap">
                         {p.user?.state}
                       </td>
@@ -525,9 +521,17 @@ const Dashboard = () => {
               </div>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={compactCharts ? 260 : 300}>
               <LineChart data={scores}>
-                <XAxis dataKey="date" className="text-xs" stroke="#888" />
+                <XAxis
+                  dataKey="date"
+                  className="text-xs"
+                  stroke="#888"
+                  interval={compactCharts ? "preserveStartEnd" : 0}
+                  angle={compactCharts ? -20 : 0}
+                  dy={compactCharts ? 8 : 0}
+                  height={compactCharts ? 50 : 30}
+                />
                 <YAxis className="text-xs" stroke="#888" />
 
                 <Tooltip
